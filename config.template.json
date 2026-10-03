@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "station": {
+    "id": "station-template",
+    "name": "Station Template",
+    "location": "UTC",
+    "is_initiator": false
+  },
+  "routing": {
+    "initiator_repo": "kreier/roundtrip",
+    "expected_previous_station": "station-0",
+    "next_station_repo": "target-user/roundtrip"
+  },
+  "telemetry": {
+    "public_pages_url": "https://target-user.github.io/roundtrip/",
+    "storage_path": "data/runs.json"
+  }
+}
