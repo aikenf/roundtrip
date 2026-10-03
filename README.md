@@ -26,6 +26,7 @@
 - **[Dispatch Protocol](docs/PROTOCOL.md)** — `repository_dispatch` webhook payload schemas, token exchange, and validation rules.
 - **[Database Schema & Reconstruction](docs/DATABASE_SCHEMA.md)** — Telemetry data schema in `data/runs.json` and the loop reconstruction algorithm.
 - **[Cron Scheduler](docs/CRON_SCHEDULER.md)** — Details on the 3:14 AM UTC cron timing, jitter calculation, and dynamic day election.
+- **[GitHub App Setup Guide](docs/GITHUB_APP_SETUP.md)** — Registering, configuring, and installing the Roundtrip Relay GitHub App across stations.
 - **[Frontend Dashboard & Gantt Chart](docs/FRONTEND_GANTT.md)** — Specification for the Vite + React interactive Gantt visualization deployed to GitHub Pages.
 
 ---
@@ -38,3 +39,39 @@
 
 ### Authentication
 Inter-station triggering uses a shared **GitHub App** installed on each station's repository, generating short-lived installation access tokens without personal access tokens (PATs).
+
+---
+
+## How to Set Up a Relay Station Fork
+
+To connect your fork to the roundtrip ring, follow these 5 steps:
+
+### 1. Fork the Repository
+Click **Fork** at the top right of [`kreier/roundtrip`](https://github.com/kreier/roundtrip) to create a copy under your GitHub account.
+
+### 2. Enable GitHub Pages Deployment
+1. Go to your fork's **Settings > Pages**.
+2. Under **Build and deployment > Source**, select **GitHub Actions**.
+
+### 3. Install the Roundtrip GitHub App
+1. Open the GitHub App installation link:
+   ```
+   https://github.com/apps/roundtrip-relay/installations/new
+   ```
+2. Select your account and choose your `roundtrip` repository.
+3. Click **Install**.
+
+### 4. Add Repository Secrets
+In your fork, navigate to **Settings > Secrets and variables > Actions > Secrets**:
+- Add `ROUNDTRIP_APP_ID`: The numeric App ID (provided by the ring coordinator).
+- Add `ROUNDTRIP_APP_PRIVATE_KEY`: The RSA private key `.pem` contents (provided by the ring coordinator).
+
+### 5. Add Repository Variables
+In your fork, navigate to **Settings > Secrets and variables > Actions > Variables**:
+- `STATION_ID`: Your unique station name (e.g. `station-yourname`).
+- `NEXT_STATION_REPO`: The repository of the next station in the ring (e.g. `anotheruser/roundtrip` or `kreier/roundtrip` to close the loop).
+- `EXPECTED_PREVIOUS_STATION` *(optional)*: The station ID of the upstream station triggering you.
+
+> [!TIP]
+> **Zero Merge Conflicts**: By storing your routing information in GitHub Actions **Variables** rather than tracked files, you can freely use GitHub's **"Sync fork"** button to pull upstream updates from `kreier/roundtrip:main` without ever overwriting your station configuration or causing git merge conflicts.
+> For more details, see [docs/STATION_CONFIG.md](docs/STATION_CONFIG.md) and [docs/GITHUB_APP_SETUP.md](docs/GITHUB_APP_SETUP.md).
