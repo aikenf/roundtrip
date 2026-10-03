@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "station_id": "kreier-station-0",
+  "runs": [
+    {
+      "round_id": "RT-2026-09-14-314",
+      "status": "COMPLETED",
+      "initiator": {
+        "station_id": "kreier-station-0",
+        "repo": "kreier/roundtrip",
+        "scheduled_time_utc": "2026-09-14T03:14:00.000Z",
+        "actual_start_utc": "2026-09-14T03:14:38.250Z",
+        "cron_jitter_ms": 38250
+      },
+      "summary": {
+        "total_roundtrip_ms": 142100,
+        "stations_count": 2,
+        "round_completed_at_utc": "2026-09-14T03:17:00.350Z"
+      },
+      "stations": [
+        {
+          "sequence": 0,
+          "station_id": "kreier-station-0",
+          "repo": "kreier/roundtrip",
+          "received_at_utc": "2026-09-14T03:14:38.250Z",
+          "workflow_started_at_utc": "2026-09-14T03:14:41.100Z",
+          "deploy_completed_at_utc": "2026-09-14T03:15:22.400Z",
+          "dispatched_next_at_utc": "2026-09-14T03:15:25.100Z",
+          "metrics": {
+            "queue_delay_ms": 2850,
+            "execution_ms": 41300,
+            "dispatch_out_ms": 2700
+          }
+        },
+        {
+          "sequence": 1,
+          "station_id": "offspring-station-1",
+          "repo": "offspring26/roundtrip",
+          "received_at_utc": "2026-09-14T03:15:27.200Z",
+          "workflow_started_at_utc": "2026-09-14T03:15:30.800Z",
+          "deploy_completed_at_utc": "2026-09-14T03:16:15.500Z",
+          "dispatched_next_at_utc": "2026-09-14T03:16:18.200Z",
+          "metrics": {
+            "queue_delay_ms": 3600,
+            "execution_ms": 44700,
+            "dispatch_out_ms": 2700
+          }
+        }
+      ]
+    }
+  ]
+}
