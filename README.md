@@ -44,16 +44,21 @@ Inter-station triggering uses a shared **GitHub App** installed on each station'
 
 ## How to Set Up a Relay Station Fork
 
-To connect your fork to the roundtrip ring, follow these 5 steps:
+To connect your fork to the roundtrip ring, follow these 6 steps:
 
 ### 1. Fork the Repository
 Click **Fork** at the top right of [`kreier/roundtrip`](https://github.com/kreier/roundtrip) to create a copy under your GitHub account.
 
-### 2. Enable GitHub Pages Deployment
+### 2. Enable GitHub Actions
+GitHub disables workflows on newly created forks by default:
+1. Navigate to the **Actions** tab on your fork.
+2. Click the green button: **"I understand my workflows, go ahead and enable them"**.
+
+### 3. Enable GitHub Pages Deployment
 1. Go to your fork's **Settings > Pages**.
 2. Under **Build and deployment > Source**, select **GitHub Actions**.
 
-### 3. Install the Roundtrip GitHub App
+### 4. Install the Roundtrip GitHub App
 1. Open the GitHub App installation link:
    ```
    https://github.com/apps/roundtrip-relay/installations/new
@@ -61,12 +66,12 @@ Click **Fork** at the top right of [`kreier/roundtrip`](https://github.com/kreie
 2. Select your account and choose your `roundtrip` repository.
 3. Click **Install**.
 
-### 4. Add Repository Secrets
+### 5. Add Repository Secrets
 In your fork, navigate to **Settings > Secrets and variables > Actions > Secrets**:
 - Add `ROUNDTRIP_APP_ID`: The numeric App ID (provided by the ring coordinator).
 - Add `ROUNDTRIP_APP_PRIVATE_KEY`: The RSA private key `.pem` contents (provided by the ring coordinator).
 
-### 5. Add Repository Variables
+### 6. Add Repository Variables
 In your fork, navigate to **Settings > Secrets and variables > Actions > Variables**:
 - `STATION_ID`: Your unique station name (e.g. `station-yourname`).
 - `NEXT_STATION_REPO`: The repository of the next station in the ring (e.g. `anotheruser/roundtrip` or `kreier/roundtrip` to close the loop).
