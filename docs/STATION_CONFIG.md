@@ -99,3 +99,37 @@ In your fork repository (`Settings > Secrets and variables > Actions > Variables
 
 ### Step 6: Inform Network Coordinator
 The preceding station updates its `NEXT_STATION_REPO` variable to point to your fork repository.
+
+---
+
+## 5. Telemetry Persistence & Sync Safety (`telemetry` Branch)
+
+To ensure that fork owners can freely click GitHub's **"Sync fork"** button without encountering merge conflicts:
+- Application source code and workflows reside on `main`.
+- Automated telemetry records (`data/runs.json`) are committed to a dedicated **`telemetry` branch**, never touching `main`.
+- On every workflow run, the runner restores the station's latest `data/runs.json` from the `telemetry` branch, records the latest hop metrics, deploys to GitHub Pages, and pushes the updated database back to `telemetry`.
+
+### Managing and Cleaning Test Runs
+
+Station owners can manage their benchmark history either directly in the web UI or via the terminal:
+
+#### 1. In the Web UI:
+- **Hide Test Runs**: Click the `🧪 Hide Test Runs` toggle to filter out `RT-TEST-*` runs.
+- **Hide Specific Runs**: Click the `✕` button on any run in the selector to hide it from your dashboard.
+- **Download Clean Database**: Click `💾 Download runs.json` to export a clean database with unwanted runs removed.
+- **Restore Runs**: Click `Restore Hidden Runs` anytime to revert filters.
+
+#### 2. Via CLI (`scripts/manage_runs.py`):
+```bash
+# List all recorded runs
+python3 scripts/manage_runs.py --list
+
+# Delete a specific test run
+python3 scripts/manage_runs.py --delete RT-2026-10-05-314
+
+# Clean all test runs containing 'TEST'
+python3 scripts/manage_runs.py --clean-tests
+
+# Commit and push changes directly to your telemetry branch
+python3 scripts/manage_runs.py --push-telemetry
+```

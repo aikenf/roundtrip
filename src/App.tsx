@@ -1,17 +1,95 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import initialRunsData from '../data/runs.json';
 import { TelemetryDatabase, BenchmarkRun } from './types';
 import { GanttChart } from './components/GanttChart';
 import { RingTopology } from './components/RingTopology';
 
+const STORAGE_KEY_HIDDEN = 'roundtrip_hidden_runs';
+const STORAGE_KEY_HIDE_TESTS = 'roundtrip_hide_tests';
+
 export const App: React.FC = () => {
   const [db] = useState<TelemetryDatabase>(initialRunsData as unknown as TelemetryDatabase);
+  const [hiddenRunIds, setHiddenRunIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_HIDDEN);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [hideTests, setHideTests] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY_HIDE_TESTS) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   const [selectedRoundIndex, setSelectedRoundIndex] = useState(0);
 
-  const activeRun: BenchmarkRun | null = db.runs && db.runs.length > 0 ? db.runs[selectedRoundIndex] : null;
+  // Sync state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_HIDDEN, JSON.stringify(hiddenRunIds));
+    } catch {
+      // ignore
+    }
+  }, [hiddenRunIds]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_HIDE_TESTS, String(hideTests));
+    } catch {
+      // ignore
+    }
+  }, [hideTests]);
+
+  // Compute visible runs based on active filters
+  const visibleRuns = (db.runs || []).filter((r) => {
+    if (hiddenRunIds.includes(r.round_id)) return false;
+    if (hideTests && (r.round_id.toUpperCase().includes('TEST'))) {
+      return false;
+    }
+    return true;
+  });
+
+  // Clamp selected round index
+  const safeIndex = Math.min(selectedRoundIndex, Math.max(0, visibleRuns.length - 1));
+  const activeRun: BenchmarkRun | null = visibleRuns.length > 0 ? visibleRuns[safeIndex] : null;
+
   const isLoopCompleted = activeRun?.status === 'COMPLETED';
   const jitterMs = activeRun?.initiator?.cron_jitter_ms || 0;
   const totalMs = activeRun?.summary?.total_roundtrip_ms;
+
+  const handleHideRun = (roundId: string) => {
+    if (window.confirm(`Hide benchmark run '${roundId}' from your dashboard view?`)) {
+      setHiddenRunIds((prev) => [...prev, roundId]);
+      setSelectedRoundIndex(0);
+    }
+  };
+
+  const handleRestoreAll = () => {
+    setHiddenRunIds([]);
+    setHideTests(false);
+  };
+
+  const handleDownloadCleanRuns = () => {
+    const cleanDb: TelemetryDatabase = {
+      ...db,
+      runs: visibleRuns,
+    };
+    const jsonStr = JSON.stringify(cleanDb, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'runs.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
@@ -42,8 +120,17 @@ export const App: React.FC = () => {
         {/* Top Summary Cards */}
         {activeRun ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg">
-              <div className="text-xs font-mono text-slate-400 uppercase tracking-wider">Active Round</div>
+            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-lg relative group">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-mono text-slate-400 uppercase tracking-wider">Active Round</div>
+                <button
+                  onClick={() => handleHideRun(activeRun.round_id)}
+                  className="text-slate-500 hover:text-rose-400 text-xs transition-colors"
+                  title="Hide this run from view"
+                >
+                  ✕ Hide
+                </button>
+              </div>
               <div className="text-xl font-bold font-mono text-slate-100 mt-2 truncate">
                 {activeRun.round_id}
               </div>
@@ -90,8 +177,16 @@ export const App: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="p-8 text-center text-slate-400 bg-slate-900 rounded-xl border border-slate-800">
-            No rounds recorded yet. The first round will initiate on the scheduled date at 03:14 AM UTC.
+          <div className="p-8 text-center text-slate-400 bg-slate-900 rounded-xl border border-slate-800 flex flex-col items-center gap-3">
+            <div>No benchmark runs visible (some may be hidden or filtered).</div>
+            {(hiddenRunIds.length > 0 || hideTests) && (
+              <button
+                onClick={handleRestoreAll}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-mono font-semibold transition-colors"
+              >
+                Restore All Hidden Runs
+              </button>
+            )}
           </div>
         )}
 
@@ -111,27 +206,97 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* Historical Rounds Selector */}
-        {db.runs && db.runs.length > 1 && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
-            <h3 className="text-md font-semibold text-slate-200 mb-4">Historical Benchmark Runs</h3>
-            <div className="flex flex-wrap gap-2">
-              {db.runs.map((r, i) => (
+        {/* Historical Rounds Selector & Management Toolbar */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-md font-semibold text-slate-200">Historical Benchmark Runs</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Select a cycle to view telemetry, filter test runs, or download a clean database.
+              </p>
+            </div>
+
+            {/* Run Management Toolbar */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Filter Test Runs Toggle */}
+              <button
+                onClick={() => setHideTests(!hideTests)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-colors flex items-center gap-1.5 ${
+                  hideTests
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-semibold'
+                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+                }`}
+                title="Toggle visibility of test runs (RT-TEST-*)"
+              >
+                <span>🧪</span> {hideTests ? 'Hiding Test Runs' : 'Hide Test Runs'}
+              </button>
+
+              {/* Restore All Button */}
+              {hiddenRunIds.length > 0 && (
                 <button
-                  key={r.round_id}
-                  onClick={() => setSelectedRoundIndex(i)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-colors ${
-                    i === selectedRoundIndex
-                      ? 'bg-blue-600 text-white font-bold'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  }`}
+                  onClick={handleRestoreAll}
+                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                  title="Restore hidden runs back into view"
                 >
-                  {r.round_id} ({r.status})
+                  Restore ({hiddenRunIds.length})
                 </button>
-              ))}
+              )}
+
+              {/* Download Clean JSON Button */}
+              <button
+                onClick={handleDownloadCleanRuns}
+                className="px-3 py-1.5 rounded-lg text-xs font-mono bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 font-semibold transition-colors flex items-center gap-1.5"
+                title="Download the currently visible runs as a clean runs.json file"
+              >
+                <span>💾</span> Download runs.json
+              </button>
             </div>
           </div>
-        )}
+
+          {/* Run Selection Pills */}
+          {visibleRuns.length > 0 ? (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800/80">
+              {visibleRuns.map((r, i) => {
+                const isSelected = i === safeIndex;
+                const isTest = r.round_id.toUpperCase().includes('TEST');
+
+                return (
+                  <div
+                    key={r.round_id}
+                    className={`flex items-center rounded-lg text-xs font-mono transition-colors ${
+                      isSelected
+                        ? 'bg-blue-600 text-white font-bold'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <button
+                      onClick={() => setSelectedRoundIndex(i)}
+                      className="px-3 py-1.5 flex items-center gap-1.5"
+                    >
+                      {isTest && <span title="Test Run">🧪</span>}
+                      <span>{r.round_id}</span>
+                      <span className="text-[10px] opacity-75">({r.status})</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleHideRun(r.round_id);
+                      }}
+                      className="pr-2 pl-0.5 text-slate-400 hover:text-rose-300 text-xs"
+                      title={`Hide ${r.round_id}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-xs text-slate-500 italic py-2">
+              All runs are currently filtered out. Click &quot;Restore&quot; to show all.
+            </div>
+          )}
+        </div>
 
         {/* Footer */}
         <footer className="pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">

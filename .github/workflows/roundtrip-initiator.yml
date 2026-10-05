@@ -41,6 +41,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Restore Persistent Telemetry from telemetry branch
+        run: |
+          if git fetch origin telemetry:telemetry 2>/dev/null; then
+            echo "Restoring data/runs.json from telemetry branch..."
+            git checkout telemetry -- data/runs.json || echo "Could not checkout runs.json from telemetry branch"
+          else
+            echo "No remote telemetry branch found. Using repository default data/runs.json."
+          fi
+
       - name: Setup Python
         uses: actions/setup-python@v7
         with:
@@ -79,12 +88,23 @@ jobs:
           # Elect next month's random day (1-30) and update cron schedule
           python3 scripts/calculate_schedule.py --update-workflow
 
-          # Commit updated runs.json and scheduled cron
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/runs.json .github/workflows/roundtrip-initiator.yml
-          git commit -m "chore(roundtrip): seal round ${ROUND_ID} and reschedule next month [skip ci]" || echo "No changes to commit"
-          git push origin main
+
+          # 1. Commit cron update to main
+          git add .github/workflows/roundtrip-initiator.yml
+          git commit -m "chore(roundtrip): reschedule next month [skip ci]" || echo "No schedule changes"
+          git push origin main || echo "Push to main skipped"
+
+          # 2. Push sealed telemetry database to dedicated telemetry branch
+          cp data/runs.json /tmp/runs_sealed.json
+          git checkout telemetry 2>/dev/null || git checkout --orphan telemetry
+          git rm -rf . 2>/dev/null || true
+          mkdir -p data
+          cp /tmp/runs_sealed.json data/runs.json
+          git add data/runs.json
+          git commit -m "chore(telemetry): seal round ${ROUND_ID} [skip ci]" || echo "No changes"
+          git push origin telemetry || echo "Push to telemetry branch skipped"
 
       # -------------------------------------------------------------
       # Case B: Initiating New Round (Cron or Manual Trigger)
@@ -170,3 +190,17 @@ jobs:
             --sequence 1 \
             --station-id "${STATION_ID}" \
             --current-repo "${{ github.repository }}"
+
+      - name: Persist Initiator Telemetry to Dedicated Branch
+        if: github.event_name != 'repository_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cp data/runs.json /tmp/runs_init.json
+          git checkout telemetry 2>/dev/null || git checkout --orphan telemetry
+          git rm -rf . 2>/dev/null || true
+          mkdir -p data
+          cp /tmp/runs_init.json data/runs.json
+          git add data/runs.json
+          git commit -m "chore(telemetry): record initiator hop for round ${{ steps.round_meta.outputs.round_id }} [skip ci]" || echo "No changes"
+          git push origin telemetry || echo "Push to telemetry branch skipped"
