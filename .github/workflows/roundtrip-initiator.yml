@@ -131,7 +131,8 @@ jobs:
           python3 scripts/reconstruct_round.py \
             --current-repo "${{ github.repository }}" \
             --next-repo "${NEXT_STATION_REPO}" \
-            --initiator-repo "${INITIATOR_REPO}" || true
+            --initiator-repo "${INITIATOR_REPO}" \
+            --current-round-id "${{ steps.round_meta.outputs.round_id }}" || true
 
       - name: Record Initiator Telemetry
         if: github.event_name != 'repository_dispatch'
@@ -159,6 +160,8 @@ jobs:
         run: |
           npm ci || npm install
           npm run build
+          mkdir -p dist/data
+          cp data/runs.json dist/data/runs.json
 
       - name: Setup Pages
         if: github.event_name != 'repository_dispatch'

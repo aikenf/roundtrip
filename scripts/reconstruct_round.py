@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
 scripts/reconstruct_round.py
-Audits and reconstructs the previous cycle's complete loop path by querying
-downstream stations across GitHub Pages / raw repositories until tracing back
-to the initiator and self (or detecting a broken loop).
+Reconciles previous benchmark runs in local data/runs.json:
+1. Identifies any prior runs still marked as 'IN_PROGRESS'.
+2. Checks the origin (initiator) station. If the initiator recorded the run as 'COMPLETED',
+   copies the sealed run data (summary, timing, complete hop trace).
+3. If not completed at origin, traces downstream station(s) to gather available hop data
+   and marks the run as 'INCOMPLETE'.
+4. Updates local data/runs.json so past rounds accurately reflect completion status.
 """
 
 import argparse
@@ -20,13 +24,16 @@ DEFAULT_DATA_PATH = os.path.join(
 )
 
 
-def fetch_station_runs(repo: str, timeout_sec: int = 10) -> dict:
-    """Fetches data/runs.json from GitHub Pages with fallback to raw GitHub repository."""
+def fetch_station_runs(repo: str, timeout_sec: int = 8) -> dict:
+    """Fetches data/runs.json from telemetry branch, main branch, or GitHub Pages."""
     owner, repo_name = repo.split("/", 1)
-    pages_url = f"https://{owner}.github.io/{repo_name}/data/runs.json"
-    raw_url = f"https://raw.githubusercontent.com/{owner}/{repo_name}/main/data/runs.json"
+    candidate_urls = [
+        f"https://raw.githubusercontent.com/{owner}/{repo_name}/telemetry/data/runs.json",
+        f"https://raw.githubusercontent.com/{owner}/{repo_name}/main/data/runs.json",
+        f"https://{owner}.github.io/{repo_name}/data/runs.json",
+    ]
 
-    for url in [pages_url, raw_url]:
+    for url in candidate_urls:
         try:
             req = urllib.request.Request(
                 url,
@@ -34,149 +41,221 @@ def fetch_station_runs(repo: str, timeout_sec: int = 10) -> dict:
             )
             with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
                 if resp.status == 200:
-                    return json.loads(resp.read().decode("utf-8"))
+                    data = json.loads(resp.read().decode("utf-8"))
+                    if isinstance(data, dict) and "runs" in data:
+                        return data
         except Exception:
             continue
     return None
 
 
-def reconstruct_previous_cycle(
+def trace_downstream_hops(
+    round_id: str,
+    start_repo: str,
+    origin_repo: str,
     current_repo: str,
-    next_repo: str,
-    initiator_repo: str,
-    target_round_id: str = None,
-    local_data_path: str = DEFAULT_DATA_PATH,
-    max_hops: int = 30,
+    max_hops: int = 15,
 ) -> dict:
-    # 1. Determine target round ID if not provided
-    if not target_round_id and os.path.exists(local_data_path):
-        try:
-            with open(local_data_path, "r", encoding="utf-8") as f:
-                local_db = json.load(f)
-                runs = local_db.get("runs", [])
-                if len(runs) >= 1:
-                    # Pick most recent past run
-                    target_round_id = runs[-1].get("round_id")
-        except Exception:
-            pass
-
-    if not target_round_id:
-        print("No prior round ID found to reconstruct. Assuming initial bootstrap cycle.")
-        return {
-            "status": "INITIAL_RUN",
-            "message": "No previous cycle history available.",
-            "trace": [],
-        }
-
-    print(f"Tracing previous cycle '{target_round_id}' starting at downstream station: {next_repo}")
-
-    hops = []
-    visited_repos = set()
-    curr_target = next_repo
+    """Traces downstream stations to collect hops if origin doesn't report COMPLETED."""
+    curr_target = start_repo
+    visited = {current_repo}
+    collected_hops = []
     loop_completed = False
-    loop_broken = False
-    broken_reason = None
+    completed_run_data = None
 
     for hop_idx in range(max_hops):
-        if curr_target in visited_repos:
-            # We encountered a node we already visited
-            if curr_target == current_repo:
-                loop_completed = True
-            else:
-                loop_broken = True
-                broken_reason = f"Premature cyclic loop detected at {curr_target}"
+        if not curr_target or curr_target in visited:
             break
-
-        visited_repos.add(curr_target)
+        visited.add(curr_target)
 
         remote_db = fetch_station_runs(curr_target)
         if not remote_db:
-            loop_broken = True
-            broken_reason = f"Station {curr_target} unreachable or has not published data/runs.json"
-            hops.append({
-                "sequence": hop_idx,
-                "repo": curr_target,
-                "status": "UNREACHABLE",
-            })
+            print(f"[Trace] Station '{curr_target}' unreachable or has no published telemetry.")
             break
 
-        # Find target round entry
-        found_run = next((r for r in remote_db.get("runs", []) if r.get("round_id") == target_round_id), None)
+        found_run = next((r for r in remote_db.get("runs", []) if r.get("round_id") == round_id), None)
         if not found_run:
-            loop_broken = True
-            broken_reason = f"Round {target_round_id} missing on station {curr_target}"
-            hops.append({
-                "sequence": hop_idx,
-                "repo": curr_target,
-                "status": "ROUND_NOT_FOUND",
-            })
+            print(f"[Trace] Round '{round_id}' not found on station '{curr_target}'.")
             break
 
-        # Extract timing and next station pointer from this station's record
-        station_steps = found_run.get("stations", [])
-        last_step = station_steps[-1] if station_steps else {}
+        for step in found_run.get("stations", []):
+            if not any(h.get("sequence") == step.get("sequence") and h.get("station_id") == step.get("station_id") for h in collected_hops):
+                collected_hops.append(step)
 
-        hop_record = {
-            "sequence": hop_idx,
-            "repo": curr_target,
-            "station_id": remote_db.get("station_id"),
-            "received_at_utc": last_step.get("received_at_utc"),
-            "deploy_completed_at_utc": last_step.get("deploy_completed_at_utc"),
-            "dispatched_next_at_utc": last_step.get("dispatched_next_at_utc"),
-            "status": "VERIFIED",
-        }
-        hops.append(hop_record)
-
-        # Check if this station looped back to current repo
-        if curr_target == current_repo:
+        if found_run.get("status") == "COMPLETED":
             loop_completed = True
+            completed_run_data = found_run
             break
 
-        # Move to next station: extract target from payload or assume topology
-        # In a closed ring, each station knows its next hop
-        # If target returned to initiator and initiator completed
-        if curr_target == initiator_repo and found_run.get("status") == "COMPLETED":
-            # Initiator completed the cycle
-            pass
-
-        # For demonstration or ring traversal, if remote db has routing or if we hit initiator:
-        # In standard setup, when we trace around the ring, if we reached initiator and we are initiator:
-        if curr_target == initiator_repo:
-            loop_completed = True
+        if curr_target == origin_repo:
             break
 
-    result = {
-        "round_id": target_round_id,
-        "status": "COMPLETED" if loop_completed else "BROKEN_LOOP",
-        "broken_reason": broken_reason,
-        "hops": hops,
+        # Follow next hop if available from trace or routing
+        next_target = None
+        # Check if next station repo can be deduced from found_run hops
+        for step in found_run.get("stations", []):
+            if step.get("repo") == curr_target and step.get("next_station_repo"):
+                next_target = step.get("next_station_repo")
+                break
+        curr_target = next_target or origin_repo
+
+    return {
+        "completed": loop_completed,
+        "completed_run_data": completed_run_data,
+        "hops": collected_hops,
     }
 
-    print(f"Reconstruction finished: status={result['status']}, hops_audited={len(hops)}")
-    return result
+
+def reconcile_prior_runs(
+    current_repo: str,
+    next_repo: str,
+    initiator_repo: str,
+    current_round_id: str = None,
+    target_round_id: str = None,
+    local_data_path: str = DEFAULT_DATA_PATH,
+    update_local: bool = True,
+) -> list:
+    """Reconciles prior in-progress runs with origin station or downstream trace."""
+    if not os.path.exists(local_data_path):
+        print(f"Local database {local_data_path} not found.")
+        return []
+
+    with open(local_data_path, "r", encoding="utf-8") as f:
+        db = json.load(f)
+
+    runs = db.get("runs", [])
+    if not runs:
+        print("No local runs found to reconcile.")
+        return []
+
+    reconciled_reports = []
+    db_modified = False
+
+    for run in runs:
+        rid = run.get("round_id")
+        status = run.get("status")
+
+        # Skip current actively running round
+        if current_round_id and rid == current_round_id:
+            continue
+
+        # If a specific round is targeted, skip others
+        if target_round_id and rid != target_round_id:
+            continue
+
+        # Only reconcile runs that are still marked IN_PROGRESS
+        if status != "IN_PROGRESS":
+            continue
+
+        origin_repo = (run.get("initiator") or {}).get("repo") or initiator_repo
+        print(f"Reconciling prior run '{rid}' (origin: {origin_repo})...")
+
+        # Step 1: Query Origin Station
+        origin_db = fetch_station_runs(origin_repo)
+        origin_run = None
+        if origin_db:
+            origin_run = next((r for r in origin_db.get("runs", []) if r.get("round_id") == rid), None)
+
+        if origin_run and origin_run.get("status") == "COMPLETED":
+            print(f"-> Origin '{origin_repo}' reports '{rid}' as COMPLETED. Adopting sealed data.")
+            run["status"] = "COMPLETED"
+            if origin_run.get("initiator"):
+                run["initiator"] = origin_run["initiator"]
+            if origin_run.get("summary"):
+                run["summary"] = origin_run["summary"]
+
+            # Merge stations: use origin's stations if more complete
+            if len(origin_run.get("stations", [])) >= len(run.get("stations", [])):
+                run["stations"] = origin_run["stations"]
+
+            db_modified = True
+            reconciled_reports.append({
+                "round_id": rid,
+                "status": "COMPLETED",
+                "source": origin_repo,
+                "stations_count": len(run.get("stations", [])),
+            })
+            continue
+
+        # Step 2: Fallback - Origin does not report COMPLETED -> Trace Downstream
+        print(f"-> Origin '{origin_repo}' does not report '{rid}' as COMPLETED. Tracing downstream '{next_repo}'...")
+        trace_result = trace_downstream_hops(
+            round_id=rid,
+            start_repo=next_repo,
+            origin_repo=origin_repo,
+            current_repo=current_repo,
+        )
+
+        if trace_result["completed"] and trace_result["completed_run_data"]:
+            comp_data = trace_result["completed_run_data"]
+            print(f"-> Downstream trace confirmed completion for '{rid}'.")
+            run["status"] = "COMPLETED"
+            if comp_data.get("summary"):
+                run["summary"] = comp_data["summary"]
+            if comp_data.get("initiator"):
+                run["initiator"] = comp_data["initiator"]
+        else:
+            print(f"-> Downstream trace found no completion for '{rid}'. Marking as INCOMPLETE.")
+            run["status"] = "INCOMPLETE"
+            if not run.get("summary") or not run["summary"].get("total_roundtrip_ms"):
+                run["summary"] = {
+                    "total_roundtrip_ms": None,
+                    "stations_count": len(run.get("stations", [])),
+                    "round_completed_at_utc": None,
+                    "note": "Cycle did not reach initiator or terminated prematurely",
+                }
+
+        # Merge any newly discovered hops from trace
+        existing_seqs = {s.get("sequence") for s in run.get("stations", [])}
+        for hop in trace_result["hops"]:
+            if hop.get("sequence") not in existing_seqs:
+                run["stations"].append(hop)
+                existing_seqs.add(hop.get("sequence"))
+
+        run["stations"].sort(key=lambda s: s.get("sequence", 0))
+        run["summary"]["stations_count"] = len(run["stations"])
+
+        db_modified = True
+        reconciled_reports.append({
+            "round_id": rid,
+            "status": run["status"],
+            "source": "downstream_trace",
+            "stations_count": len(run["stations"]),
+        })
+
+    if db_modified and update_local:
+        with open(local_data_path, "w", encoding="utf-8") as f:
+            json.dump(db, f, indent=2)
+        print(f"Saved reconciled runs to {local_data_path}")
+
+    return reconciled_reports
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Reconstruct previous roundtrip cycle")
+    parser = argparse.ArgumentParser(description="Reconcile and reconstruct previous roundtrip cycles")
     parser.add_argument("--current-repo", default=os.getenv("GITHUB_REPOSITORY", "kreier/roundtrip"))
     parser.add_argument("--next-repo", default=os.getenv("NEXT_STATION_REPO", "offspring26/roundtrip"))
     parser.add_argument("--initiator-repo", default=os.getenv("INITIATOR_REPO", "kreier/roundtrip"))
-    parser.add_argument("--round-id", help="Explicit round ID to reconstruct")
+    parser.add_argument("--current-round-id", help="Active incoming round ID (to exclude from reconciliation)")
+    parser.add_argument("--round-id", help="Explicit round ID to reconcile")
     parser.add_argument("--data-path", default=DEFAULT_DATA_PATH)
+    parser.add_argument("--no-save", action="store_true", help="Do not save changes to data/runs.json")
     parser.add_argument("--json", action="store_true")
 
     args = parser.parse_args()
 
-    recon = reconstruct_previous_cycle(
+    results = reconcile_prior_runs(
         current_repo=args.current_repo,
         next_repo=args.next_repo,
         initiator_repo=args.initiator_repo,
+        current_round_id=args.current_round_id,
         target_round_id=args.round_id,
         local_data_path=args.data_path,
+        update_local=not args.no_save,
     )
 
     if args.json:
-        print(json.dumps(recon, indent=2))
+        print(json.dumps(results, indent=2))
 
 
 if __name__ == "__main__":
