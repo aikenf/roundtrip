@@ -55,7 +55,7 @@
       "initiator": {},
       "summary": {
         "total_roundtrip_ms": null,
-        "stations_count": 7,
+        "stations_count": 10,
         "round_completed_at_utc": null
       },
       "stations": [
@@ -143,6 +143,44 @@
           "dispatched_next_at_utc": null,
           "metrics": {
             "queue_delay_ms": 8435,
+            "execution_ms": 0,
+            "dispatch_out_ms": 0
+          }
+        },
+        {
+          "sequence": 7,
+          "station_id": "station-aikenf",
+          "repo": "aikenf/roundtrip",
+          "received_at_utc": null,
+          "workflow_started_at_utc": null,
+          "deploy_completed_at_utc": null,
+          "dispatched_next_at_utc": "2026-10-05T17:42:41.702Z",
+          "metrics": {
+            "execution_ms": 0
+          }
+        },
+        {
+          "sequence": 8,
+          "station_id": "station-flynn0",
+          "repo": "flynn0/roundtrip",
+          "received_at_utc": null,
+          "workflow_started_at_utc": null,
+          "deploy_completed_at_utc": null,
+          "dispatched_next_at_utc": "2026-10-05T17:43:17.972Z",
+          "metrics": {
+            "execution_ms": 0
+          }
+        },
+        {
+          "sequence": 9,
+          "station_id": "station-kreier",
+          "repo": "kreier/roundtrip",
+          "received_at_utc": "2026-10-05T17:43:17.972Z",
+          "workflow_started_at_utc": "2026-10-05T17:43:29.000Z",
+          "deploy_completed_at_utc": null,
+          "dispatched_next_at_utc": null,
+          "metrics": {
+            "queue_delay_ms": 11028,
             "execution_ms": 0,
             "dispatch_out_ms": 0
           }
