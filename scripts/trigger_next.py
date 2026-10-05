@@ -178,14 +178,39 @@ def main():
         "trace": [],
     }
 
+    initiator_info = {}
     if args.payload_file and os.path.exists(args.payload_file):
         try:
             with open(args.payload_file, "r", encoding="utf-8") as f:
                 prev_payload = json.load(f)
-                payload["initiator"] = prev_payload.get("initiator", {})
+                initiator_info = prev_payload.get("initiator", {})
                 payload["trace"] = prev_payload.get("trace", [])
         except Exception as e:
             print(f"Warning: Failed to read incoming payload file: {e}", file=sys.stderr)
+
+    if not initiator_info:
+        runs_path = os.path.join(os.getcwd(), "data", "runs.json")
+        if os.path.exists(runs_path):
+            try:
+                with open(runs_path, "r", encoding="utf-8") as f:
+                    runs_db = json.load(f)
+                    for r in runs_db.get("runs", []):
+                        if r.get("round_id") == args.round_id and r.get("initiator"):
+                            initiator_info = r.get("initiator")
+                            break
+            except Exception as e:
+                pass
+
+    if not initiator_info:
+        initiator_info = {
+            "station_id": args.station_id,
+            "repo": args.current_repo,
+            "scheduled_time_utc": now_iso,
+            "actual_start_utc": now_iso,
+            "cron_jitter_ms": 0,
+        }
+
+    payload["initiator"] = initiator_info
 
     # Append current station's hop record to trace
     payload["trace"].append({

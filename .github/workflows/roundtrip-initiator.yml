@@ -25,6 +25,7 @@ concurrency:
 jobs:
   run-initiator:
     runs-on: ubuntu-latest
+    if: github.repository == (vars.INITIATOR_REPO || 'kreier/roundtrip')
     steps:
       - name: Record Initialization Timestamp
         id: timestamps
@@ -35,13 +36,13 @@ jobs:
           echo "today=${TODAY}" >> $GITHUB_OUTPUT
 
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -129,9 +130,9 @@ jobs:
 
       - name: Setup Node & Build Dashboard
         if: github.event_name != 'repository_dispatch'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install npm dependencies & Build
         if: github.event_name != 'repository_dispatch'
@@ -141,18 +142,18 @@ jobs:
 
       - name: Setup Pages
         if: github.event_name != 'repository_dispatch'
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload GitHub Pages Artifact
         if: github.event_name != 'repository_dispatch'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: './dist'
 
       - name: Deploy to GitHub Pages
         if: github.event_name != 'repository_dispatch'
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
       - name: Dispatch Next Station via GitHub App
         if: github.event_name != 'repository_dispatch'

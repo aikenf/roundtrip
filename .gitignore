@@ -150,3 +150,7 @@ vite.config.ts.timestamp-*
 
 # Roundtrip local configuration
 .roundtrip/
+
+# Python cache
+__pycache__/
+*.py[cod]

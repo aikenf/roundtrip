@@ -88,7 +88,7 @@ def record_station_run(
 
     if not run:
         # Construct initiator block
-        if incoming_payload and "initiator" in incoming_payload:
+        if incoming_payload and incoming_payload.get("initiator"):
             initiator_info = incoming_payload["initiator"]
         elif is_initiator:
             jitter = delta_ms(scheduled_time, workflow_started_at) if scheduled_time else 0
@@ -178,7 +178,11 @@ def record_station_run(
     # If this is loop closure (Initiator receiving final hop)
     if is_loop_closure and is_initiator:
         run["status"] = "COMPLETED"
-        init_start = run["initiator"]["actual_start_utc"]
+        init_start = (run.get("initiator") or {}).get("actual_start_utc")
+        if not init_start and run.get("stations"):
+            init_start = run["stations"][0].get("workflow_started_at_utc")
+        if not init_start:
+            init_start = workflow_started_at
         completed_ts = deploy_completed_at or dispatched_next_at or to_iso(datetime.datetime.now(datetime.timezone.utc))
         run["summary"]["round_completed_at_utc"] = completed_ts
         run["summary"]["total_roundtrip_ms"] = delta_ms(init_start, completed_ts)
