@@ -1,10 +1,5 @@
 import React from 'react';
-
-interface StationStep {
-  sequence: number;
-  station_id: string;
-  repo: string;
-}
+import { StationStep } from '../types';
 
 interface RingTopologyProps {
   stations: StationStep[];

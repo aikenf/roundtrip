@@ -1,20 +1,7 @@
 import React from 'react';
+import { StationStep } from '../types';
 
-export interface StationStep {
-  sequence: number;
-  station_id: string;
-  repo: string;
-  received_at_utc?: string;
-  workflow_started_at_utc?: string;
-  deploy_completed_at_utc?: string;
-  dispatched_next_at_utc?: string;
-  metrics?: {
-    queue_delay_ms?: number;
-    execution_ms?: number;
-    deploy_ms?: number;
-    dispatch_out_ms?: number;
-  };
-}
+export type { StationStep };
 
 interface GanttChartProps {
   stations: StationStep[];

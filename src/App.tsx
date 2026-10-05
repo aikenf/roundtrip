@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import initialRunsData from '../data/runs.json';
+import { TelemetryDatabase, BenchmarkRun } from './types';
 import { GanttChart } from './components/GanttChart';
 import { RingTopology } from './components/RingTopology';
 
 export const App: React.FC = () => {
-  const [db] = useState(initialRunsData);
+  const [db] = useState<TelemetryDatabase>(initialRunsData as unknown as TelemetryDatabase);
   const [selectedRoundIndex, setSelectedRoundIndex] = useState(0);
 
-  const activeRun = db.runs && db.runs.length > 0 ? db.runs[selectedRoundIndex] : null;
+  const activeRun: BenchmarkRun | null = db.runs && db.runs.length > 0 ? db.runs[selectedRoundIndex] : null;
   const isLoopCompleted = activeRun?.status === 'COMPLETED';
   const jitterMs = activeRun?.initiator?.cron_jitter_ms || 0;
   const totalMs = activeRun?.summary?.total_roundtrip_ms;
