@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "1.0.0",
-  "station_id": "kreier-station-0",
+  "station_id": "station-kreier",
   "runs": [
     {
       "round_id": "RT-2026-09-14-314",
@@ -45,6 +45,68 @@
             "queue_delay_ms": 3600,
             "execution_ms": 44700,
             "dispatch_out_ms": 2700
+          }
+        }
+      ]
+    },
+    {
+      "round_id": "RT-2026-10-05-314",
+      "status": "IN_PROGRESS",
+      "initiator": {},
+      "summary": {
+        "total_roundtrip_ms": null,
+        "stations_count": 4,
+        "round_completed_at_utc": null
+      },
+      "stations": [
+        {
+          "sequence": 0,
+          "station_id": "station-kreier",
+          "repo": "kreier/roundtrip",
+          "received_at_utc": null,
+          "workflow_started_at_utc": null,
+          "deploy_completed_at_utc": null,
+          "dispatched_next_at_utc": "2026-10-05T17:38:07.864Z",
+          "metrics": {
+            "execution_ms": 0
+          }
+        },
+        {
+          "sequence": 1,
+          "station_id": "station-aikenf",
+          "repo": "aikenf/roundtrip",
+          "received_at_utc": null,
+          "workflow_started_at_utc": null,
+          "deploy_completed_at_utc": null,
+          "dispatched_next_at_utc": "2026-10-05T17:38:45.332Z",
+          "metrics": {
+            "execution_ms": 0
+          }
+        },
+        {
+          "sequence": 2,
+          "station_id": "station-flynn0",
+          "repo": "flynn0/roundtrip",
+          "received_at_utc": null,
+          "workflow_started_at_utc": null,
+          "deploy_completed_at_utc": null,
+          "dispatched_next_at_utc": "2026-10-05T17:39:27.351Z",
+          "metrics": {
+            "execution_ms": 0
+          }
+        },
+        {
+          "sequence": 3,
+          "station_id": "station-kreier",
+          "repo": "kreier/roundtrip",
+          "received_at_utc": "2026-10-05T17:39:27.351Z",
+          "workflow_started_at_utc": "2026-10-05T17:39:36.000Z",
+          "deploy_completed_at_utc": null,
+          "dispatched_next_at_utc": null,
+          "metrics": {
+            "queue_delay_ms": 8649,
+            "execution_ms": 0,
+            "dispatch_out_ms": 0
           }
         }
       ]
