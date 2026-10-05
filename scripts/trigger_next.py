@@ -152,9 +152,18 @@ def main():
     parser.add_argument("--station-id", default=os.getenv("STATION_ID", "station-0"))
     parser.add_argument("--current-repo", default=os.getenv("GITHUB_REPOSITORY", "kreier/roundtrip"))
     parser.add_argument("--payload-file", help="Path to base payload file to append to")
+    parser.add_argument("--max-hops", type=int, default=int(os.getenv("MAX_HOPS", "12")), help="Maximum allowed hops")
     parser.add_argument("--dry-run", action="store_true", help="Simulate without firing live API calls")
 
     args = parser.parse_args()
+
+    if args.sequence > args.max_hops:
+        print(
+            f"Safety limit reached: Hop sequence {args.sequence} exceeds maximum allowed hops ({args.max_hops}). "
+            f"Halting propagation to prevent infinite runaway loops.",
+            file=sys.stderr,
+        )
+        sys.exit(0)
 
     app_id = os.getenv("ROUNDTRIP_APP_ID")
     private_key = os.getenv("ROUNDTRIP_APP_PRIVATE_KEY")

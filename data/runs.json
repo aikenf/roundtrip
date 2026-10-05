@@ -51,12 +51,18 @@
     },
     {
       "round_id": "RT-2026-10-05-314",
-      "status": "IN_PROGRESS",
-      "initiator": {},
+      "status": "COMPLETED",
+      "initiator": {
+        "station_id": "station-kreier",
+        "repo": "kreier/roundtrip",
+        "scheduled_time_utc": "2026-10-05T17:38:00.000Z",
+        "actual_start_utc": "2026-10-05T17:38:07.864Z",
+        "cron_jitter_ms": 7864
+      },
       "summary": {
-        "total_roundtrip_ms": null,
+        "total_roundtrip_ms": 754136,
         "stations_count": 19,
-        "round_completed_at_utc": null
+        "round_completed_at_utc": "2026-10-05T17:50:42.000Z"
       },
       "stations": [
         {
