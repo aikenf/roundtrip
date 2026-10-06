@@ -101,7 +101,7 @@ export const App: React.FC = () => {
               <span className="text-3xl">🔄</span>
               <h1 className="text-2xl font-bold tracking-tight text-white">Roundtrip Benchmark</h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                v0.1.0
+                v1.0.0
               </span>
             </div>
             <p className="text-sm text-slate-400 mt-1">

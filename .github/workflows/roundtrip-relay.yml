@@ -37,12 +37,14 @@ jobs:
           fetch-depth: 0
 
       - name: Restore Persistent Telemetry from telemetry branch
+        env:
+          TARGET_BRANCH: ${{ vars.TELEMETRY_BRANCH || (github.repository == 'kreier/roundtrip' && 'telemetry-origin' || 'telemetry') }}
         run: |
-          if git fetch origin telemetry:telemetry 2>/dev/null; then
-            echo "Restoring data/runs.json from telemetry branch..."
-            git checkout telemetry -- data/runs.json || echo "Could not checkout runs.json from telemetry branch"
+          if git fetch origin ${TARGET_BRANCH}:${TARGET_BRANCH} 2>/dev/null; then
+            echo "Restoring data/runs.json from ${TARGET_BRANCH} branch..."
+            git checkout ${TARGET_BRANCH} -- data/runs.json || echo "Could not checkout runs.json from ${TARGET_BRANCH} branch"
           else
-            echo "No remote telemetry branch found. Using repository default data/runs.json."
+            echo "No remote ${TARGET_BRANCH} branch found. Using repository default data/runs.json."
           fi
 
       - name: Setup Python
@@ -152,14 +154,16 @@ jobs:
             --payload-file /tmp/payload.json
 
       - name: Commit Updated Telemetry to Dedicated Branch
+        env:
+          TARGET_BRANCH: ${{ vars.TELEMETRY_BRANCH || (github.repository == 'kreier/roundtrip' && 'telemetry-origin' || 'telemetry') }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           cp data/runs.json /tmp/runs_to_persist.json
-          git checkout telemetry 2>/dev/null || git checkout --orphan telemetry
+          git checkout ${TARGET_BRANCH} 2>/dev/null || git checkout --orphan ${TARGET_BRANCH}
           git rm -rf . 2>/dev/null || true
           mkdir -p data
           cp /tmp/runs_to_persist.json data/runs.json
           git add data/runs.json
           git commit -m "chore(telemetry): record station metrics for round ${{ steps.parse_payload.outputs.round_id }} [skip ci]" || echo "No changes"
-          git push origin telemetry || echo "Push to telemetry branch skipped"
+          git push origin ${TARGET_BRANCH} || echo "Push to ${TARGET_BRANCH} branch skipped"

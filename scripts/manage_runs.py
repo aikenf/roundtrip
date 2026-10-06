@@ -77,8 +77,26 @@ def clean_test_runs(data: dict) -> int:
     return removed
 
 
-def push_to_telemetry_branch(data_path: str = DEFAULT_DATA_PATH):
-    print("Pushing data/runs.json to 'telemetry' git branch...")
+def get_default_telemetry_branch() -> str:
+    if os.getenv("TELEMETRY_BRANCH"):
+        return os.getenv("TELEMETRY_BRANCH")
+    try:
+        remote_url = subprocess.check_output(
+            ["git", "remote", "get-url", "origin"],
+            stderr=subprocess.DEVNULL,
+            text=True
+        ).strip()
+        if "kreier/roundtrip" in remote_url:
+            return "telemetry-origin"
+    except Exception:
+        pass
+    return "telemetry"
+
+
+def push_to_telemetry_branch(data_path: str = DEFAULT_DATA_PATH, branch: str = None):
+    if not branch:
+        branch = get_default_telemetry_branch()
+    print(f"Pushing data/runs.json to '{branch}' git branch...")
     try:
         subprocess.run(["git", "config", "user.name", "Roundtrip Manager"], check=True)
         subprocess.run(["git", "config", "user.email", "roundtrip@users.noreply.github.com"], check=True)
@@ -87,20 +105,20 @@ def push_to_telemetry_branch(data_path: str = DEFAULT_DATA_PATH):
         with open(data_path, "r", encoding="utf-8") as src, open(temp_file, "w", encoding="utf-8") as dst:
             dst.write(src.read())
 
-        subprocess.run(["git", "checkout", "telemetry"], stderr=subprocess.DEVNULL) or \
-            subprocess.run(["git", "checkout", "--orphan", "telemetry"], check=True)
+        subprocess.run(["git", "checkout", branch], stderr=subprocess.DEVNULL) or \
+            subprocess.run(["git", "checkout", "--orphan", branch], check=True)
         subprocess.run(["git", "rm", "-rf", "."], stderr=subprocess.DEVNULL)
         os.makedirs(os.path.dirname(data_path), exist_ok=True)
         with open(temp_file, "r", encoding="utf-8") as src, open(data_path, "w", encoding="utf-8") as dst:
             dst.write(src.read())
         subprocess.run(["git", "add", data_path], check=True)
         subprocess.run(["git", "commit", "-m", "chore(telemetry): manage runs database [skip ci]"], check=True)
-        subprocess.run(["git", "push", "origin", "telemetry"], check=True)
+        subprocess.run(["git", "push", "origin", branch], check=True)
         # Return to main
         subprocess.run(["git", "checkout", "main"], check=True)
-        print("Successfully updated and pushed 'telemetry' branch.")
+        print(f"Successfully updated and pushed '{branch}' branch.")
     except Exception as e:
-        print(f"Error pushing to telemetry branch: {e}", file=sys.stderr)
+        print(f"Error pushing to {branch} branch: {e}", file=sys.stderr)
 
 
 def main():
@@ -110,7 +128,8 @@ def main():
     parser.add_argument("--delete", metavar="ROUND_ID", help="Delete a specific round by ID")
     parser.add_argument("--clean-tests", action="store_true", help="Remove all test runs with 'TEST' in round ID")
     parser.add_argument("--keep-recent", type=int, metavar="N", help="Keep only the N most recent runs")
-    parser.add_argument("--push-telemetry", action="store_true", help="Push updated database to 'telemetry' git branch")
+    parser.add_argument("--branch", metavar="BRANCH", help="Target git branch (default: telemetry-origin for origin, telemetry for forks)")
+    parser.add_argument("--push-telemetry", action="store_true", help="Push updated database to telemetry git branch")
 
     args = parser.parse_args()
 
@@ -138,7 +157,7 @@ def main():
     if modified:
         save_runs(data, args.data_path)
         if args.push_telemetry:
-            push_to_telemetry_branch(args.data_path)
+            push_to_telemetry_branch(args.data_path, branch=args.branch)
 
 
 if __name__ == "__main__":

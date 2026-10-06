@@ -102,12 +102,14 @@ The preceding station updates its `NEXT_STATION_REPO` variable to point to your 
 
 ---
 
-## 5. Telemetry Persistence & Sync Safety (`telemetry` Branch)
+## 5. Telemetry Persistence & Sync Safety (`telemetry` vs `telemetry-origin`)
 
-To ensure that fork owners can freely click GitHub's **"Sync fork"** button without encountering merge conflicts:
+To ensure that fork owners can freely click GitHub's **"Sync fork"** button without encountering merge conflicts or telemetry data loss:
 - Application source code and workflows reside on `main`.
-- Automated telemetry records (`data/runs.json`) are committed to a dedicated **`telemetry` branch**, never touching `main`.
-- On every workflow run, the runner restores the station's latest `data/runs.json` from the `telemetry` branch, records the latest hop metrics, deploys to GitHub Pages, and pushes the updated database back to `telemetry`.
+- Upstream origin (`kreier/roundtrip`) commits its own telemetry to **`telemetry-origin`**.
+- Station forks automatically commit their telemetry to **`telemetry`**.
+- Because the origin repository does not have a branch named `telemetry`, GitHub's fork UI treats each fork's `telemetry` branch as a **standalone, untracked branch**. It will never display *"commits ahead/behind"* banners or prompt fork maintainers to discard or sync commits on `telemetry`.
+- On every workflow run, the runner restores the station's latest `data/runs.json` from its respective telemetry branch (`telemetry` for forks, `telemetry-origin` for origin), records the latest hop metrics, deploys to GitHub Pages, and pushes the updated database back to the dedicated branch.
 
 ### Managing and Cleaning Test Runs
 
